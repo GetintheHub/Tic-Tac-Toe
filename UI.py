@@ -2,14 +2,27 @@ from tkinter import *
 
 # Function for starting the game 
 def gameStartedUI(start):
-    if start == 1:
-        root = Tk()
-        root.title("Tic-Tac-Toe")
-        root.geometry("500x500")
+    root = Tk()
+    root.title("Tic-Tac-Toe")
+    root.geometry("500x500")
+    gameFrame = Frame(root)
+    gameFrame.pack(fill=BOTH, expand=True)
 
-        gameFrame = Frame(root)
-        gameFrame.pack(fill=BOTH, expand=True)
+    if start == 0:
+        
 
+        
+
+        ##Loading screen frame
+        
+        loadingLabel = Label(gameFrame, text = 'Waiting For Players....')
+        loadingLabel.pack(fill=BOTH, expand=True)
+    
+        
+    else: 
+   
+        
+    
         # Creates grid
         for i in range(3):
             gameFrame.rowconfigure(i, weight=1)
@@ -17,19 +30,26 @@ def gameStartedUI(start):
 
 
         #Button functionality 
-        def changeCharacter(b):
-            b.config(text = 'X')
-       
+        def changeCharacter(b, turn):
+            if turn == 1: 
+                b.config(text = 'X')
                 
+            else:
+                b.config(text = 'O')
                 
-        
+
+        def disableButton(button):
+            button.configure(state=DISABLED)
+            button.configure(command = disableButton)
+
+            
             
 
         def buttonClicked(button):
-            button.configure(command = lambda b = button: changeCharacter(b))
+            button.configure(command = lambda b = button:( changeCharacter(b, turn), disableButton(button)))
             
-
-            
+        
+        
 
         
             
@@ -69,7 +89,11 @@ def gameStartedUI(start):
         p9Button.grid(row=2, column=2, sticky='nsew')
         buttonClicked(p9Button)
 
-        root.mainloop()
+    root.mainloop()
 
-start = 1
+start = 0
+turn = 0
+
+#Need to connect start with the server for waiting for the game to start and then with Mathews code for when the game ends
+#Need to connect turn with Mathews game logic
 gameStartedUI(start)
