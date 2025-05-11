@@ -4,44 +4,68 @@ import threading
 HOST = "127.0.0.1"
 PORT = 65432
 
-clients = []
-addresses = []
+clients = [None, None]  # first player gets x second gets o
+symbols = ["X", "O"]
+turn = "X"  #X starts firsst
+lock = threading.Lock()
 
-# Accept and store two clients
-def accept_clients(server_socket):
-    while len(clients) < 2:
-        conn, addr = server_socket.accept()
-        clients.append(conn)
-        addresses.append(addr)
-        print(f"Player {len(clients)-1} connected from {addr}")
+def handle_client(conn, player_id):
+    global turn
+    symbol = symbols[player_id]
+    other_id = 1 - player_id
 
-        # Send START,<player_id> to the client
-        conn.sendall(f"START,{len(clients)-1}".encode())
+    try:
+        print(f"[+] Player {symbol} connected.")
+        conn.sendall(symbol.encode('utf-8'))  
 
-    print("Both players connected. Game can begin.")
+        while True:
+            data = conn.recv(1024)
+            if not data:
+                break
 
-# Start the server
+            msg = data.decode('utf-8')
+            print(f"[{symbol}] says: {msg}")
+
+            with lock:
+                if msg.startswith(turn):  
+                    if clients[other_id]:
+                        try:
+                            clients[other_id].sendall(data)
+                        except Exception as e:
+                            print(f"[!] Error relaying to {symbols[other_id]}: {e}")
+
+                    # Flip turn
+                    turn = symbols[other_id]
+                    print(f"[TURN] Now it's {turn}'s turn.")
+                else:
+                    print(f"[BLOCKED] Not {symbol}'s turn.")
+    except Exception as e:
+        print(f"[!] Error with player {symbol}: {e}")
+    finally:
+        print(f"[-] Player {symbol} disconnected.")
+        clients[player_id] = None
+        conn.close()
+
+#server loop starts
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.bind((HOST, PORT))
-    s.listen()
-    print(f"Server listening on {HOST}:{PORT}...")
+    s.listen(2)
+    print("[SERVER] Waiting for 2 players...")
 
-    accept_clients(s)
-
-    # Main loop for receiving and broadcasting moves
     while True:
-        for idx, conn in enumerate(clients):
-            try:
-                conn.settimeout(0.1)
-                data = conn.recv(1024).decode()
-                if data:
-                    print(f"Player {idx} sent: {data}")
-                    # Broadcast to both players
-                    for client in clients:
-                        client.sendall(data.encode())
-            except socket.timeout:
-                continue
-            except ConnectionResetError:
-                print(f"Player {idx} disconnected.")
-                conn.close()
-                clients.remove(conn)
+        conn, addr = s.accept()
+
+        # Assign to player X or O
+        if clients[0] is None:
+            player_id = 0
+        elif clients[1] is None:
+            player_id = 1
+        else:
+            conn.close()
+            continue
+
+        clients[player_id] = conn
+        threading.Thread(target=handle_client, args=(conn, player_id), daemon=True).start()
+
+        if all(clients):
+            print("[SERVER] Both players connected. Game starting.")
