@@ -4,9 +4,9 @@ import threading
 HOST = "127.0.0.1"
 PORT = 65432
 
-clients = [None, None]  # first player gets x second gets o
+clients = [None, None]  # first player gets X, second gets O
 symbols = ["X", "O"]
-turn = "X"  #X starts firsst
+turn = "X"  # X starts first
 lock = threading.Lock()
 
 def handle_client(conn, player_id):
@@ -27,6 +27,14 @@ def handle_client(conn, player_id):
             print(f"[{symbol}] says: {msg}")
 
             with lock:
+                if msg == "RESET":
+                    print(f"[RESET] {symbol} requested a new game.")
+                    turn = "X"
+                    for c in clients:
+                        if c:
+                            c.sendall("RESET".encode('utf-8'))
+                    continue  # skip rest of loop this round
+
                 if msg.startswith(turn):  
                     if clients[other_id]:
                         try:
@@ -34,7 +42,6 @@ def handle_client(conn, player_id):
                         except Exception as e:
                             print(f"[!] Error relaying to {symbols[other_id]}: {e}")
 
-                    # Flip turn
                     turn = symbols[other_id]
                     print(f"[TURN] Now it's {turn}'s turn.")
                 else:
@@ -46,7 +53,7 @@ def handle_client(conn, player_id):
         clients[player_id] = None
         conn.close()
 
-#server loop starts
+# Server loop starts
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.bind((HOST, PORT))
     s.listen(2)
